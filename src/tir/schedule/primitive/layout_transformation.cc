@@ -51,7 +51,7 @@ class TransformLayoutRewriter : private StmtExprMutator {
 
   void RewriteBufferAccess(Buffer* buffer, Array<PrimExpr>* indices) {
     *buffer = new_buffer_;
-    *indices = index_map_->Apply(*indices);
+    *indices = index_map_->MapIndices(*indices);
   }
 
   PrimExpr VisitExpr_(const BufferLoadNode* op) final {
@@ -209,7 +209,7 @@ struct TransformLayoutTraits : public UnpackedInstTraits<TransformLayoutTraits> 
     py.Input("block", block_rv);
     py.Input("buffer_index", buffer_index);
     py.Input("is_write_index", is_write_index);
-    py.Input("index_map", index_map->ToPythonString());
+    py.Input("index_map", index_map);
     return py.Str();
   }
 

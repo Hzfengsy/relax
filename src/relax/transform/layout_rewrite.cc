@@ -128,22 +128,22 @@ class LayoutRewriteInserter : public ExprMutator {
     const Buffer& src_buffer = te::decl_buffer(info.src_shape, info.dtype, "src", "global");
     const Buffer& tgt_buffer = te::decl_buffer(info.tgt_shape, info.dtype, "tgt", "global");
     Array<PrimExpr> src_indices;
-    for (tir::Var v : info.index_map->src_iters) {
+    for (tir::Var v : info.index_map->initial_indices) {
       src_indices.push_back(v);
     }
     tir::Stmt body = tir::BufferStore(tgt_buffer, tir::BufferLoad(src_buffer, src_indices),
-                                      info.index_map->tgt_iters);
+                                      info.index_map->final_indices);
     Array<tir::IterVar> block_iters;
     for (int i = 0; i < static_cast<int>(info.src_shape.size()); i++) {
       block_iters.push_back(tir::IterVar(Range::FromMinExtent(0, info.src_shape[i]),
-                                         info.index_map->src_iters[i], tir::kDataPar));
+                                         info.index_map->initial_indices[i], tir::kDataPar));
     }
     Map<String, ObjectRef> annotations;
     annotations.Set(tir::attr::script_parsing_detect_access, IntImm(DataType::Int(32), 3));
     body = tir::Block(block_iters, {}, {}, "layout_rewrite", body, NullOpt, {}, {}, annotations);
     Array<PrimExpr> loop_vars;
     for (int i = 0; i < static_cast<int>(info.src_shape.size()); i++) {
-      loop_vars.push_back(info.index_map->src_iters[i].copy_with_suffix("v"));
+      loop_vars.push_back(info.index_map->initial_indices[i].copy_with_suffix("v"));
     }
     body = tir::BlockRealize(loop_vars, Bool(true), Downcast<tir::Block>(body));
     for (int i = info.src_shape.size() - 1; i >= 0; i--) {
