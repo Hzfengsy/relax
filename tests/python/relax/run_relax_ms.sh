@@ -1,19 +1,17 @@
 set -euxo pipefail
 
-RPC_HOST="127.0.0.1"
-RPC_PORT="4446"
-RPC_KEY="local"
-# rpc_host = "172.16.2.241"
-# rpc_port = 4445
-# rpc_key = "amd-5900x"
+RPC_HOST="172.16.2.241"
+RPC_PORT="4445"
+RPC_KEY="rtx-3080"
 
-NUM_TRIALS=64
+NUM_TRIALS=128
 
 
 run () {
     name=$1
     target=$2
     device=$3
+    tune_model=$4
 
     log_dir=$PWD/$name-$device
     mkdir -p $log_dir
@@ -28,8 +26,10 @@ run () {
         --rpc-host "$RPC_HOST"              \
         --rpc-port "$RPC_PORT"              \
         --rpc-key "$RPC_KEY"                \
+        --tune-model $tune_model            \
         2>&1 | tee "$log_dir/$name.log"
 }
 
 
-run resnet18 "llvm --num-cores=16" cpu
+run resnet18 "llvm --num-cores=16" cpu 0
+run resnet18 "nvidia/geforce-rtx-2070" cuda 0

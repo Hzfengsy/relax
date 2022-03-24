@@ -14,26 +14,25 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+import os
+
 import tvm
 import tvm.testing
 import tvm.relay.testing
 import tvm.meta_schedule as ms
 
-from tvm import relax
+from tvm import tir, relax
 from tvm import transform
+from tvm.ir.module import IRModule
 from tvm.meta_schedule import tune_relax, EvolutionarySearchConfig
 from tvm.meta_schedule.builder import BuilderInput, LocalBuilder
-from tvm.meta_schedule.runner import RunnerInput, EvaluatorConfig, RPCRunner
-
-from tvm.script import relax as R
+from tvm.meta_schedule.runner import EvaluatorConfig, RunnerInput, RPCRunner
 from tvm.relax.testing import relay_translator
+from tvm.target.target import Target
 
-import os
-import itertools
 import logging
+import itertools
 import argparse
-import numpy as np
-from pathlib import Path
 
 
 def _parse_args():
@@ -78,6 +77,11 @@ def _parse_args():
         type=str,
         required=True,
     )
+    args.add_argument(
+        "--tune-model",
+        type=int,
+        required=True,
+    )
     parsed = args.parse_args()
     parsed.target = tvm.target.Target(parsed.target)
     if parsed.target.attrs.get("mtriple", None) == "aarch64-linux-gnu":
@@ -92,6 +96,7 @@ def _parse_args():
     )
     parsed.rpc_workers = parsed.rpc_config.count_num_servers(allow_missing=False)
     parsed.device = tvm.cpu() if parsed.device == "cpu" else tvm.cuda()
+    parsed.tune_model = False if parsed.tune_model == 0 else True
     return parsed
 
 
@@ -126,6 +131,23 @@ def f_run_evaluator(session, rt_mod, device, evaluator_config, repeated_args):
     return costs
 
 
+def apply_postproc(mod: IRModule, target: Target):
+    ctx = ms.TuneContext(
+        mod=mod,
+        target=target,
+        postprocs=ms.tune.Parse._postproc(postproc=None, target=target),
+        task_name="untuned",
+    )
+    for rule in ctx.postprocs:
+        rule.initialize_with_tune_context(ctx)
+
+    sch = tir.Schedule(mod, debug_mask="all")
+    sch.enter_postproc()
+    for postproc in ctx.postprocs:
+        assert postproc.apply(sch)
+    return sch.mod
+
+
 def main():
     task_name = ARGS.model
     work_dir = ARGS.work_dir
@@ -150,25 +172,24 @@ def main():
     relax_mod = relay_translator.from_relay(relay_mod["main"])
     assert isinstance(relax_mod, tvm.IRModule)
 
-    # print(R.parser.astext(relax_mod))
-
-    tune_relax(
-        mod=relax_mod,
-        target=ARGS.target,
-        config=EvolutionarySearchConfig(
-            num_trials_per_iter=64,
-            num_trials_total=ARGS.num_trials,
-        ),
-        runner=ms.runner.RPCRunner(
-            rpc_config=ARGS.rpc_config,
-            alloc_repeat=3,
-            max_workers=ARGS.rpc_workers,
-        ),
-        database=database,
-        task_name=task_name,
-        work_dir=work_dir,
-        num_threads=os.cpu_count(),
-    )
+    if ARGS.tune_model:
+        tune_relax(
+            mod=relax_mod,
+            target=ARGS.target,
+            config=EvolutionarySearchConfig(
+                num_trials_per_iter=64,
+                num_trials_total=ARGS.num_trials,
+            ),
+            runner=ms.runner.RPCRunner(
+                rpc_config=ARGS.rpc_config,
+                alloc_repeat=3,
+                max_workers=ARGS.rpc_workers,
+            ),
+            database=database,
+            task_name=task_name,
+            work_dir=work_dir,
+            num_threads=os.cpu_count(),
+        )
 
     def run_and_measure(mod: tvm.IRModule):
         builder = LocalBuilder(f_build=f_build)
@@ -209,8 +230,9 @@ def main():
         results = [result.value for result in runner_result.run_secs]
         return sum(results) / len(results)
 
+    relax_mod_untuned = apply_postproc(relax_mod, ARGS.target)
     relax_mod_best = relax.transform.MetaScheduleApplyHistoryBest(database, ARGS.target)(relax_mod)
-    print(f"untuned: {run_and_measure(relax_mod)} seconds")
+    print(f"untuned: {run_and_measure(relax_mod_untuned)} seconds")
     print(f"  tuned: {run_and_measure(relax_mod_best)} seconds")
 
 
