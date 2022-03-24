@@ -17,7 +17,7 @@ run () {
     mkdir -p $log_dir
 
     echo "Running model $name"
-    python3 test_e2e_autotir.py             \
+    python3 e2e_autotir.py                  \
         --model "$name"                     \
         --target "$target"                  \
         --device "$device"                  \
