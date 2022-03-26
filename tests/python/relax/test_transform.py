@@ -359,55 +359,5 @@ def test_to_anf_no_op():
 
     assert_structural_equal(mod, mod_post)
 
-def test_fold_constant():
-    @tvm.script.ir_module
-    class InputModule:
-        @T.prim_func
-        def tir_matmul(x: T.handle, y: T.handle, z: T.handle) -> None:
-            T.func_attr({"global_symbol": "tir_matmul","layout_free_placeholders": [x]})
-            A = T.match_buffer(x, (16, 16))
-            B = T.match_buffer(y, (16, 16))
-            C = T.match_buffer(z, (16, 16))
-            for i0, j, k0, i1, k1 in T.grid(4, 16, 4, 4, 4):
-                with T.block("matmul"):
-                    vi = T.axis.S(16, i0*4+i1)
-                    vj = T.axis.S(16, j)
-                    vk = T.axis.R(16, k0*4+k1)
-                    with T.init():
-                        C[vi, vj] = T.float32(0)
-                    C[vi, vj] = C[vi, vj] + A[vi, vk] * B[vk, vj]
-
-        @R.function
-        def foo(w: Tensor[(16, 16), "float32"]) -> Tensor[(16, 16), "float32"]:
-            x = relax.const([[1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,12.,13.,14.,15.,16.],
-                             [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,12.,13.,14.,15.,16.],
-                             [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,12.,13.,14.,15.,16.],
-                             [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,12.,13.,14.,15.,16.],
-                             [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,12.,13.,14.,15.,16.],
-                             [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,12.,13.,14.,15.,16.],
-                             [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,12.,13.,14.,15.,16.],
-                             [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,12.,13.,14.,15.,16.],
-                             [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,12.,13.,14.,15.,16.],
-                             [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,12.,13.,14.,15.,16.],
-                             [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,12.,13.,14.,15.,16.],
-                             [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,12.,13.,14.,15.,16.],
-                             [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,12.,13.,14.,15.,16.],
-                             [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,12.,13.,14.,15.,16.],
-                             [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,12.,13.,14.,15.,16.],
-                             [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,12.,13.,14.,15.,16.]
-                            ])
-            gv0 = R.call_tir(tir_matmul, (x, w), (16, 16), dtype="float32")
-            return gv0
-
-    mod = InputModule
-    print(R.parser.astext(mod))
-    new_mod =relax.transform.LayoutRewrite()(mod)
-    new_mod = relax.transform.FoldConstant()(new_mod)
-    #todo: change it into a check
-    print(R.parser.astext(new_mod))
-
-#todo: testcase for fold constant with 2 calls
-
-
 if __name__ == "__main__":
     pytest.main([__file__])

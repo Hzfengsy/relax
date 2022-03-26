@@ -55,7 +55,7 @@ Array<PrimExpr> NormalizeShapeForRelax(const Array<PrimExpr>& shape){
 
 class LayoutRewriteInserter : public ExprMutator {
  public:
-  LayoutRewriteInserter(IRModule module) : module_(module) {
+  LayoutRewriteInserter(IRModule module) : module_(GetRef<IRModule>(module.CopyOnWrite())) {
     InitializeIndexMaps();
   }
   

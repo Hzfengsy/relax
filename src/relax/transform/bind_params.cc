@@ -109,17 +109,18 @@ inline Function BindParamsByName(Function func,
 }
 
 IRModule BindParam(IRModule m, Map<String, runtime::NDArray> param) {
+  IRModuleNode* new_module = m.CopyOnWrite();
   Map<GlobalVar, BaseFunc> functions = m->functions;
   for (const auto& func_pr : functions) {
     if (const auto* relax_f = func_pr.second.as<FunctionNode>()) {
       if (relax_f->name.value()->name_hint == "main") {
         Function f_after_bind = BindParamsByName(GetRef<Function>(relax_f),
                                                  param);
-        m->Update(func_pr.first, f_after_bind);
+        new_module->Update(func_pr.first, f_after_bind);
       }
     }
   }
-  return m;
+  return GetRef<IRModule>(new_module);
 }
 
 namespace transform {
