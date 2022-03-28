@@ -157,7 +157,7 @@ class ConstantFolder : public ExprMutator {
       // value_or will return value if it is not null, otherwise return or
       return ConstEvaluateCallTIR(func.value(), arr_args.value(), shape.value()).value_or(call);
     }
-    // TODO(hongyi): support const-fole tuple outputs
+    // TODO(hongyi): support const-fold tuple outputs
     return std::move(call);
   }
 
