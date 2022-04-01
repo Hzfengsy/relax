@@ -201,15 +201,26 @@ class GraphCreator : public ExprVisitor {
       const Tuple& args = Downcast<Tuple>(call->args[1]);
       // TODO(tvm-team): handle the shape argument (args[3])
       Optional<Integer> opt_pattern = func->GetAttr<Integer>("op_pattern");
+      OpPatternKind pattern;
       if (opt_pattern.defined()) {
-        cur_pattern_ = static_cast<OpPatternKind>(Downcast<IntImm>(opt_pattern)->value);
+        pattern = static_cast<OpPatternKind>(Downcast<IntImm>(opt_pattern)->value);
       } else {
-        cur_pattern_ = OpPatternKind::kOpaque;
+        pattern = OpPatternKind::kOpaque;
       }
-
       // The pattern of the current binding variable node is set to the pattern of this operator.
-      SetNodePattern(cur_binding_var_node_, cur_pattern_);
+      SetNodePattern(cur_binding_var_node_, pattern);
+
       for (const Expr& arg : args->fields) {
+        // If the operator pattern was detected to be `kBroadcast`, and meanwhile this argument has
+        // the same shape as the operator output, the relation between this argument and the output
+        // is actually element-wise. And in this case we change the pattern to `kElemWise`
+        // temporarily.
+        if (pattern == OpPatternKind::kBroadcast && structural_equal_(call->shape_, arg->shape_)) {
+          LOG(INFO) << "[13]. Change current pattern to element-wise";
+          cur_pattern_ = OpPatternKind::kElemWise;
+        } else {
+          cur_pattern_ = pattern;
+        }
         VisitExpr(arg);
       }
     } else {
@@ -261,8 +272,6 @@ class GraphCreator : public ExprVisitor {
   }
 
   void VisitExpr_(const VarNode* var) final {
-    LOG(INFO) << "[10]. Visiting VarNode " << var
-              << ", cur_binding_var_node_ = " << cur_binding_var_node_;
     // If the variable is not under a binding, there is no need to recurse into it.
     if (cur_binding_var_node_ == nullptr) {
       return;
@@ -379,6 +388,8 @@ class GraphCreator : public ExprVisitor {
   OpPatternKind cur_pattern_ = OpPatternKind::kOpaque;
   /*! \brief The graph nodes whose patterns are set */
   std::unordered_set<IndexedForwardGraph::Node*> initialized_nodes_;
+  /*! \brief The structural equality checker */
+  StructuralEqual structural_equal_;
 };
 
 /*!
@@ -663,7 +674,7 @@ class OperatorFusor : public ExprMutator {
       //  variable.
       //  - Otherwise, emit a dataflow variable.
       Var new_var{nullptr};
-      Call call_to_emit = Call(func_info.global_var_, UpdateArgs(func_info.arguments_));
+      Call call_to_emit = Call(gv_func_pair.first, UpdateArgs(func_info.arguments_));
       if (i < static_cast<int>(block->bindings.size()) - 1) {
         new_var = builder_->Emit(call_to_emit);
       } else {
@@ -759,7 +770,7 @@ class OperatorFusor : public ExprMutator {
       }
 
       Function existing_func = (*it).second.second;
-      if (StructuralEqual()(func, existing_func)) {
+      if (structural_equal_(func, existing_func)) {
         LOG(INFO) << "[2]. deduplicate function " << gv->name_hint;
         return std::make_pair((*it).second.first, (*it).second.second);
       }
@@ -781,6 +792,8 @@ class OperatorFusor : public ExprMutator {
   std::unordered_map<GraphPartitioner::Group*, FunctionCreator> group2func_;
   /*! \brief The new global variables and functions to be added to the module */
   std::unordered_map<std::string, std::pair<GlobalVar, Function>> new_functions_;
+  /*! \brief The structural equality checker */
+  StructuralEqual structural_equal_;
 };
 
 IRModule FuseOps(IRModule mod, int opt_level, size_t max_fuse_depth) {
