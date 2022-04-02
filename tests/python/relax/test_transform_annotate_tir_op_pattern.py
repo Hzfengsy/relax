@@ -44,14 +44,10 @@ def test_annotate_opkind_outewisefusable():
                         C[vi, vj] = T.float32(0)
                     C[vi, vj] = C[vi, vj] + A[vi, vk] * B[vk, vj]
 
-        @R.function
-        def foo(x: Tensor[(m, n), "float32"], w: Tensor[(n, k), "float32"]) -> Tensor:
-            gv0 = R.call_tir( tir_matmul, (x, w), (m, k), dtype="float32")
-            return gv0
-
     mod = InputModule
-    new_mod =relax.transform.AnnotateTIROpPattern()(mod)
+    new_mod = relax.transform.AnnotateTIROpPattern()(mod)
     assert new_mod["tir_matmul"].attrs["op_pattern"] == 4
+
 
 def test_annotate_opkind_reduce():
     @tvm.script.ir_module
@@ -66,16 +62,13 @@ def test_annotate_opkind_reduce():
                 with T.block("matmul"):
                     vi, vj = T.axis.remap("SR", [i, j])
                     with T.init():
-                        B[vi] = 0.
+                        B[vi] = 0.0
                     B[vi] += A[vi, vj]
 
-        @R.function
-        def foo(x: Tensor[(16, 16), "float32"]) -> Tensor:
-            gv0 = R.call_tir(sum, (x), (16,), dtype="float32")
-            return gv0
     mod = InputModule
-    new_mod =relax.transform.AnnotateTIROpPattern()(mod)
+    new_mod = relax.transform.AnnotateTIROpPattern()(mod)
     assert new_mod["sum"].attrs["op_pattern"] == 3
+
 
 def test_annotate_opkind_ewise():
     @tvm.script.ir_module
@@ -89,16 +82,12 @@ def test_annotate_opkind_ewise():
             for i, j in T.grid(16, 16):
                 with T.block("matmul"):
                     vi, vj = T.axis.remap("SS", [i, j])
-                    B[vi, vj] = A[vi, vj]+1.0
-
-        @R.function
-        def foo(x: Tensor[(16, 16), "float32"]) -> Tensor:
-            gv0 = R.call_tir(elemwise, (x), (16, 16), dtype="float32")
-            return gv0
+                    B[vi, vj] = A[vi, vj] + 1.0
 
     mod = InputModule
-    new_mod =relax.transform.AnnotateTIROpPattern()(mod)
+    new_mod = relax.transform.AnnotateTIROpPattern()(mod)
     assert new_mod["elemwise"].attrs["op_pattern"] == 0
+
 
 def test_annotate_opkind_broadcast():
     @tvm.script.ir_module
@@ -114,14 +103,10 @@ def test_annotate_opkind_broadcast():
                     vi0, vj0, vi1, vj1 = T.axis.remap("SSSS", [i0, j0, i1, j1])
                     B[vi0, vj0, vi1, vj1] = A[vj0, vj1]
 
-        @R.function
-        def foo(x: Tensor[(16, 16), "float32"]) -> Tensor:
-            gv0 = R.call_tir(broadcast, (x, ), (16, 16, 16, 16), dtype="float32")
-            return gv0
-
     mod = InputModule
-    new_mod =relax.transform.AnnotateTIROpPattern()(mod)
+    new_mod = relax.transform.AnnotateTIROpPattern()(mod)
     assert new_mod["broadcast"].attrs["op_pattern"] == 1
+
 
 def test_annotate_opkind_injective():
     @tvm.script.ir_module
@@ -135,22 +120,22 @@ def test_annotate_opkind_injective():
             for i, j in T.grid(16, 16):
                 with T.block("matmul"):
                     vi, vj = T.axis.remap("SS", [i, j])
-                    B[vi, vj] = A[vi//4, vj//4, vi%4, vj%4]
-
-        @R.function
-        def foo(x: Tensor[(4, 4, 4, 4), "float32"]) -> Tensor:
-            gv0 = R.call_tir(injective, (x, ), (16, 16), dtype="float32")
-            return gv0
+                    B[vi, vj] = A[vi // 4, vj // 4, vi % 4, vj % 4]
 
     mod = InputModule
-    new_mod =relax.transform.AnnotateTIROpPattern()(mod)
+    new_mod = relax.transform.AnnotateTIROpPattern()(mod)
     assert new_mod["injective"].attrs["op_pattern"] == 2
 
-def test_annotate_op_kind_bias_add():
+
+def test_annotate_opkind_bias_add():
     @tvm.script.ir_module
     class InputModule:
         @T.prim_func
-        def tir_bias_add(rxplaceholder_2: T.Buffer[(1, 1000), "float32"], rxplaceholder_3: T.Buffer[(1000,), "float32"], T_add_1: T.Buffer[(1, 1000), "float32"]) -> None:
+        def tir_bias_add(
+            rxplaceholder_2: T.Buffer[(1, 1000), "float32"],
+            rxplaceholder_3: T.Buffer[(1000,), "float32"],
+            T_add_1: T.Buffer[(1, 1000), "float32"],
+        ) -> None:
             # function attr dict
             T.func_attr({"global_symbol": "tir_bias_add", "tir.noalias": True})
             # body
@@ -162,14 +147,10 @@ def test_annotate_op_kind_bias_add():
                     T.writes(T_add_1[ax0, ax1])
                     T_add_1[ax0, ax1] = rxplaceholder_2[ax0, ax1] + rxplaceholder_3[ax1]
 
-        @R.function
-        def foo(x: Tensor[(1, 1000), "float32"], y: Tensor[(1000, ), "float32"]) -> Tensor:
-            gv0 = R.call_tir(tir_bias_add, (x, y), (1, 1000), dtype="float32")
-            return gv0
-
     mod = InputModule
-    new_mod =relax.transform.AnnotateTIROpPattern()(mod)
+    new_mod = relax.transform.AnnotateTIROpPattern()(mod)
     assert new_mod["tir_bias_add"].attrs["op_pattern"] == 1
+
 
 if __name__ == "__main__":
     pytest.main([__file__])
