@@ -16,12 +16,23 @@
 # under the License.
 
 from __future__ import annotations  # must import to defer parsing of annotations
+import enum
 import pytest
 import tvm
 from tvm import relax
 
 import tvm.script
-from tvm.script import tir as T, relax as R
+from tvm.script import tir as T
+
+
+class OpPatternKind(enum.IntEnum):
+    kElemWise = 0
+    kBroadcast = 1
+    kInjective = 2
+    kCommReduce = 3
+    kOutEWiseFusable = 4
+    kTuple = 7
+    kOpaque = 8
 
 
 def test_annotate_opkind_outewisefusable():
@@ -46,7 +57,7 @@ def test_annotate_opkind_outewisefusable():
 
     mod = InputModule
     new_mod = relax.transform.AnnotateTIROpPattern()(mod)
-    assert new_mod["tir_matmul"].attrs["op_pattern"] == 4
+    assert new_mod["tir_matmul"].attrs["op_pattern"] == OpPatternKind.kOutEWiseFusable
 
 
 def test_annotate_opkind_reduce():
@@ -67,7 +78,7 @@ def test_annotate_opkind_reduce():
 
     mod = InputModule
     new_mod = relax.transform.AnnotateTIROpPattern()(mod)
-    assert new_mod["sum"].attrs["op_pattern"] == 3
+    assert new_mod["sum"].attrs["op_pattern"] == OpPatternKind.kCommReduce
 
 
 def test_annotate_opkind_ewise():
@@ -86,7 +97,7 @@ def test_annotate_opkind_ewise():
 
     mod = InputModule
     new_mod = relax.transform.AnnotateTIROpPattern()(mod)
-    assert new_mod["elemwise"].attrs["op_pattern"] == 0
+    assert new_mod["elemwise"].attrs["op_pattern"] == OpPatternKind.kElemWise
 
 
 def test_annotate_opkind_broadcast():
@@ -105,7 +116,7 @@ def test_annotate_opkind_broadcast():
 
     mod = InputModule
     new_mod = relax.transform.AnnotateTIROpPattern()(mod)
-    assert new_mod["broadcast"].attrs["op_pattern"] == 1
+    assert new_mod["broadcast"].attrs["op_pattern"] == OpPatternKind.kBroadcast
 
 
 def test_annotate_opkind_injective():
@@ -124,7 +135,7 @@ def test_annotate_opkind_injective():
 
     mod = InputModule
     new_mod = relax.transform.AnnotateTIROpPattern()(mod)
-    assert new_mod["injective"].attrs["op_pattern"] == 2
+    assert new_mod["injective"].attrs["op_pattern"] == OpPatternKind.kInjective
 
 
 def test_annotate_opkind_bias_add():
@@ -132,9 +143,9 @@ def test_annotate_opkind_bias_add():
     class InputModule:
         @T.prim_func
         def tir_bias_add(
-            rxplaceholder_2: T.Buffer[(1, 1000), "float32"],
-            rxplaceholder_3: T.Buffer[(1000,), "float32"],
-            T_add_1: T.Buffer[(1, 1000), "float32"],
+            A: T.Buffer[(1, 1000), "float32"],
+            B: T.Buffer[(1000,), "float32"],
+            C: T.Buffer[(1, 1000), "float32"],
         ) -> None:
             # function attr dict
             T.func_attr({"global_symbol": "tir_bias_add", "tir.noalias": True})
@@ -143,13 +154,13 @@ def test_annotate_opkind_bias_add():
             for i0, i1 in T.grid(1, 1000):
                 with T.block("T_add"):
                     ax0, ax1 = T.axis.remap("SS", [i0, i1])
-                    T.reads(rxplaceholder_2[ax0, ax1], rxplaceholder_3[ax1])
-                    T.writes(T_add_1[ax0, ax1])
-                    T_add_1[ax0, ax1] = rxplaceholder_2[ax0, ax1] + rxplaceholder_3[ax1]
+                    T.reads(A[ax0, ax1], B[ax1])
+                    T.writes(C[ax0, ax1])
+                    C[ax0, ax1] = A[ax0, ax1] + B[ax1]
 
     mod = InputModule
     new_mod = relax.transform.AnnotateTIROpPattern()(mod)
-    assert new_mod["tir_bias_add"].attrs["op_pattern"] == 1
+    assert new_mod["tir_bias_add"].attrs["op_pattern"] == OpPatternKind.kBroadcast
 
 
 def test_annotate_opkind_add_broadcast_with_unit_shape():
@@ -157,23 +168,23 @@ def test_annotate_opkind_add_broadcast_with_unit_shape():
     class InputModule:
         @T.prim_func
         def add_with_unit_dim_len_broadcast(
-            rxplaceholder_2: T.Buffer[(1, 64, 112, 112), "float32"],
-            rxplaceholder_3: T.Buffer[(64, 1, 1), "float32"],
-            T_add_1: T.Buffer[(1, 64, 112, 112), "float32"],
+            A: T.Buffer[(1, 64, 112, 112), "float32"],
+            B: T.Buffer[(64, 1, 1), "float32"],
+            C: T.Buffer[(1, 64, 112, 112), "float32"],
         ) -> None:
             T.func_attr({"global_symbol": "add5", "tir.noalias": True})
             for i0, i1, i2, i3 in T.grid(1, 64, 112, 112):
                 with T.block("T_add"):
                     ax0, ax1, ax2, ax3 = T.axis.remap("SSSS", [i0, i1, i2, i3])
-                    T.reads(rxplaceholder_2[ax0, ax1, ax2, ax3], rxplaceholder_3[ax1, 0, 0])
-                    T.writes(T_add_1[ax0, ax1, ax2, ax3])
-                    T_add_1[ax0, ax1, ax2, ax3] = (
-                        rxplaceholder_2[ax0, ax1, ax2, ax3] + rxplaceholder_3[ax1, 0, 0]
-                    )
+                    T.reads(A[ax0, ax1, ax2, ax3], B[ax1, 0, 0])
+                    T.writes(C[ax0, ax1, ax2, ax3])
+                    C[ax0, ax1, ax2, ax3] = A[ax0, ax1, ax2, ax3] + B[ax1, 0, 0]
 
     mod = InputModule
     new_mod = relax.transform.AnnotateTIROpPattern()(mod)
-    assert new_mod["add_with_unit_dim_len_broadcast"].attrs["op_pattern"] == 1
+    assert (
+        new_mod["add_with_unit_dim_len_broadcast"].attrs["op_pattern"] == OpPatternKind.kBroadcast
+    )
 
 
 def test_annotate_opkind_add_element_wise_with_unit_shape():
@@ -181,23 +192,23 @@ def test_annotate_opkind_add_element_wise_with_unit_shape():
     class InputModule:
         @T.prim_func
         def add_with_unit_dim_len_element_wise(
-            rxplaceholder_2: T.Buffer[(64, 112, 112), "float32"],
-            rxplaceholder_3: T.Buffer[(1, 64, 112, 112, 1, 1), "float32"],
-            T_add_1: T.Buffer[(64, 112, 112), "float32"],
+            A: T.Buffer[(64, 112, 112), "float32"],
+            B: T.Buffer[(1, 64, 112, 112, 1, 1), "float32"],
+            C: T.Buffer[(64, 112, 112), "float32"],
         ) -> None:
             T.func_attr({"global_symbol": "add5", "tir.noalias": True})
             for i0, i1, i2 in T.grid(64, 112, 112):
                 with T.block("T_add"):
                     ax0, ax1, ax2 = T.axis.remap("SSS", [i0, i1, i2])
-                    T.reads(rxplaceholder_2[ax0, ax1, ax2], rxplaceholder_3[0, ax0, ax1, ax2, 0, 0])
-                    T.writes(T_add_1[ax0, ax1, ax2])
-                    T_add_1[ax0, ax1, ax2] = (
-                        rxplaceholder_2[ax0, ax1, ax2] + rxplaceholder_3[0, ax0, ax1, ax2, 0, 0]
-                    )
+                    T.reads(A[ax0, ax1, ax2], B[0, ax0, ax1, ax2, 0, 0])
+                    T.writes(C[ax0, ax1, ax2])
+                    C[ax0, ax1, ax2] = A[ax0, ax1, ax2] + B[0, ax0, ax1, ax2, 0, 0]
 
     mod = InputModule
     new_mod = relax.transform.AnnotateTIROpPattern()(mod)
-    assert new_mod["add_with_unit_dim_len_element_wise"].attrs["op_pattern"] == 0
+    assert (
+        new_mod["add_with_unit_dim_len_element_wise"].attrs["op_pattern"] == OpPatternKind.kElemWise
+    )
 
 
 def test_annotate_opkind_add_zero_dim_element_wise():
@@ -205,21 +216,21 @@ def test_annotate_opkind_add_zero_dim_element_wise():
     class InputModule:
         @T.prim_func
         def add_zero_dim(
-            rxplaceholder_2: T.Buffer[(128,), "float32"],
-            rxplaceholder_3: T.Buffer[(), "float32"],
-            T_add_1: T.Buffer[(128,), "float32"],
+            A: T.Buffer[(128,), "float32"],
+            B: T.Buffer[(), "float32"],
+            C: T.Buffer[(128,), "float32"],
         ) -> None:
             T.func_attr({"global_symbol": "add8", "tir.noalias": True})
             for i0 in T.serial(128):
                 with T.block("T_add"):
                     ax0 = T.axis.spatial(128, i0)
-                    T.reads(rxplaceholder_2[ax0], rxplaceholder_3[()])
-                    T.writes(T_add_1[ax0])
-                    T_add_1[ax0] = rxplaceholder_2[ax0] + rxplaceholder_3[()]
+                    T.reads(A[ax0], B[()])
+                    T.writes(C[ax0])
+                    C[ax0] = A[ax0] + B[()]
 
     mod = InputModule
     new_mod = relax.transform.AnnotateTIROpPattern()(mod)
-    assert new_mod["add_zero_dim"].attrs["op_pattern"] == 0
+    assert new_mod["add_zero_dim"].attrs["op_pattern"] == OpPatternKind.kElemWise
 
 
 if __name__ == "__main__":
