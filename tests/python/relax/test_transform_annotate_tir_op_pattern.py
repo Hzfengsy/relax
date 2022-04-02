@@ -187,30 +187,6 @@ def test_annotate_opkind_add_broadcast_with_unit_shape():
     )
 
 
-def test_annotate_opkind_add_element_wise_with_unit_shape():
-    @tvm.script.ir_module
-    class InputModule:
-        @T.prim_func
-        def add_with_unit_dim_len_element_wise(
-            A: T.Buffer[(64, 112, 112), "float32"],
-            B: T.Buffer[(1, 64, 112, 112, 1, 1), "float32"],
-            C: T.Buffer[(64, 112, 112), "float32"],
-        ) -> None:
-            T.func_attr({"global_symbol": "add5", "tir.noalias": True})
-            for i0, i1, i2 in T.grid(64, 112, 112):
-                with T.block("T_add"):
-                    ax0, ax1, ax2 = T.axis.remap("SSS", [i0, i1, i2])
-                    T.reads(A[ax0, ax1, ax2], B[0, ax0, ax1, ax2, 0, 0])
-                    T.writes(C[ax0, ax1, ax2])
-                    C[ax0, ax1, ax2] = A[ax0, ax1, ax2] + B[0, ax0, ax1, ax2, 0, 0]
-
-    mod = InputModule
-    new_mod = relax.transform.AnnotateTIROpPattern()(mod)
-    assert (
-        new_mod["add_with_unit_dim_len_element_wise"].attrs["op_pattern"] == OpPatternKind.kElemWise
-    )
-
-
 def test_annotate_opkind_add_zero_dim_element_wise():
     @tvm.script.ir_module
     class InputModule:
