@@ -2034,7 +2034,9 @@ class PatternKindAnalyzer : public StmtExprVisitor {
   }
 
   void VisitExpr_(const BufferLoadNode* op) final {
-    loads_.push_back(GetRef<BufferLoad>(op));
+    if (op->indices.size() > 0) {
+      loads_.push_back(GetRef<BufferLoad>(op));
+    }
     ExprVisitor::VisitExpr_(op);
   }
 
