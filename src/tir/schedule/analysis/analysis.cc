@@ -1930,15 +1930,22 @@ bool CheckElemwisePattern(const Array<PrimExpr>& indices_l, const Array<PrimExpr
   return true;
 }
 
-bool CheckBroadcastPattern(const Array<PrimExpr>& indices_l, const Array<PrimExpr>& indices_r) {
-  if (indices_l.size() < indices_r.size()) {
-    return false;
-  }
+bool CheckBroadcastPattern(const Array<PrimExpr>& store_indices, const BufferLoad& buffer_load) {
   int j = 0;
-  for (int i = 0; i < static_cast<int>(indices_r.size()); i++) {
-    for (; j < static_cast<int>(indices_l.size()) && !indices_l[j].same_as(indices_r[i]); j++)
-      ;
-    if (j == static_cast<int>(indices_l.size())) {
+  const Buffer& loaded_buf = buffer_load->buffer;
+  int ndim_loaded_buf = loaded_buf->shape.size();
+  int ndim_stored_buf = store_indices.size();
+
+  for (int i = 0; i < ndim_loaded_buf; ++i) {
+    if (is_const_int(loaded_buf->shape[i], 1) &&
+        is_const_int(is_const_int(buffer_load->indices[i], 0))) {
+      continue;
+    }
+
+    while (j < ndim_stored_buf && !store_indices[j].same_as(buffer_load->indices[i])) {
+      ++j;
+    }
+    if (j == ndim_stored_buf) {
       return false;
     }
   }
@@ -2006,12 +2013,12 @@ bool CheckFMA(Stmt body) {
 
 class PatternKindAnalyzer : public StmtExprVisitor {
   void VisitStmt_(const BufferStoreNode* op) final {
-    store_indices_ = op->indices;
+    store_ = GetRef<BufferStore>(op);
     StmtVisitor::VisitStmt_(op);
   }
 
   void VisitExpr_(const BufferLoadNode* op) final {
-    load_indices_.push_back(op->indices);
+    loads_.push_back(GetRef<BufferLoad>(op));
     ExprVisitor::VisitExpr_(op);
   }
 
@@ -2021,20 +2028,19 @@ class PatternKindAnalyzer : public StmtExprVisitor {
       return;
     }
 
-    load_indices_.clear();
-    store_indices_.clear();
+    loads_.clear();
     StmtVisitor::VisitStmt(op->body);
 
     relay::OpPatternKind index_pair_pattern = relay::kElemWise;
-    if (load_indices_.empty()) {
+    if (loads_.empty()) {
       index_pair_pattern = relay::kBroadcast;
     } else {
-      for (int i = 0; i < static_cast<int>(load_indices_.size()); i++) {
-        if (CheckElemwisePattern(store_indices_, load_indices_[i])) {
+      for (int i = 0; i < static_cast<int>(loads_.size()); ++i) {
+        if (CheckElemwisePattern(store_->indices, loads_[i]->indices)) {
           index_pair_pattern = std::max(index_pair_pattern, relay::kElemWise);
-        } else if (CheckBroadcastPattern(store_indices_, load_indices_[i])) {
+        } else if (CheckBroadcastPattern(store_->indices, loads_[i])) {
           index_pair_pattern = std::max(index_pair_pattern, relay::kBroadcast);
-        } else if (CheckInjectivePattern(store_indices_, load_indices_[i])) {
+        } else if (CheckInjectivePattern(store_->indices, loads_[i]->indices)) {
           index_pair_pattern = std::max(index_pair_pattern, relay::kInjective);
         } else {
           index_pair_pattern = relay::kOpaque;
@@ -2064,8 +2070,8 @@ class PatternKindAnalyzer : public StmtExprVisitor {
     }
   }
 
-  Array<PrimExpr> store_indices_;
-  Array<Array<PrimExpr>> load_indices_;
+  BufferStore store_;
+  Array<BufferLoad> loads_;
   relay::OpPatternKind kind_ = relay::kElemWise;
 
  public:
