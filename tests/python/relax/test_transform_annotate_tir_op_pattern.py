@@ -200,5 +200,27 @@ def test_annotate_opkind_add_element_wise_with_unit_shape():
     assert new_mod["add_with_unit_dim_len_element_wise"].attrs["op_pattern"] == 0
 
 
+def test_annotate_opkind_add_zero_dim_element_wise():
+    @tvm.script.ir_module
+    class InputModule:
+        @T.prim_func
+        def add_zero_dim(
+            rxplaceholder_2: T.Buffer[(128,), "float32"],
+            rxplaceholder_3: T.Buffer[(), "float32"],
+            T_add_1: T.Buffer[(128,), "float32"],
+        ) -> None:
+            T.func_attr({"global_symbol": "add8", "tir.noalias": True})
+            for i0 in T.serial(128):
+                with T.block("T_add"):
+                    ax0 = T.axis.spatial(128, i0)
+                    T.reads(rxplaceholder_2[ax0], rxplaceholder_3[()])
+                    T.writes(T_add_1[ax0])
+                    T_add_1[ax0] = rxplaceholder_2[ax0] + rxplaceholder_3[()]
+
+    mod = InputModule
+    new_mod = relax.transform.AnnotateTIROpPattern()(mod)
+    assert new_mod["add_zero_dim"].attrs["op_pattern"] == 0
+
+
 if __name__ == "__main__":
     pytest.main([__file__])
