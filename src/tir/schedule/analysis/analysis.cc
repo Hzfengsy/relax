@@ -1937,8 +1937,7 @@ bool CheckBroadcastPattern(const Array<PrimExpr>& store_indices, const BufferLoa
   int ndim_stored_buf = store_indices.size();
 
   for (int i = 0; i < ndim_loaded_buf; ++i) {
-    if (is_const_int(loaded_buf->shape[i], 1) &&
-        is_const_int(is_const_int(buffer_load->indices[i], 0))) {
+    if (is_const_int(loaded_buf->shape[i], 1) && is_const_int(buffer_load->indices[i], 0)) {
       continue;
     }
 
