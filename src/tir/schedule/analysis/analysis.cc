@@ -1917,32 +1917,16 @@ bool CheckSameArray(const Array<PrimExpr>& arr1, const Array<PrimExpr>& arr2) {
   return true;
 }
 
-bool CheckElemwisePattern(const Array<PrimExpr>& store_indices, const BufferLoad& buffer_load) {
-  const Buffer& loaded_buf = buffer_load->buffer;
-  int ndim_loaded_buf = loaded_buf->shape.size();
-  int ndim_stored_buf = store_indices.size();
-
-  int j = 0;
-  for (int i = 0; i < ndim_stored_buf; ++i, ++j) {
-    while (j < ndim_loaded_buf &&                    //
-           is_const_int(loaded_buf->shape[j], 1) &&  //
-           is_const_int(is_const_int(buffer_load->indices[j], 0))) {
-      ++j;
-    }
-
-    if (j == ndim_loaded_buf || !store_indices[i].same_as(buffer_load->indices[j])) {
+bool CheckElemwisePattern(const Array<PrimExpr>& indices_l, const Array<PrimExpr>& indices_r) {
+  if (indices_l.size() != indices_r.size()) {
+    return false;
+  }
+  int n = indices_l.size();
+  for (int i = 0; i < n; i++) {
+    if (!indices_l[i].same_as(indices_r[i])) {
       return false;
     }
   }
-
-  while (j < ndim_loaded_buf) {
-    if (!(is_const_int(loaded_buf->shape[j], 1) &&
-          is_const_int(is_const_int(buffer_load->indices[j], 0)))) {
-      return false;
-    }
-    ++j;
-  }
-
   return true;
 }
 
@@ -2054,7 +2038,7 @@ class PatternKindAnalyzer : public StmtExprVisitor {
       index_pair_pattern = relay::kBroadcast;
     } else {
       for (int i = 0; i < static_cast<int>(loads_.size()); ++i) {
-        if (CheckElemwisePattern(store_->indices, loads_[i])) {
+        if (CheckElemwisePattern(store_->indices, loads_[i]->indices)) {
           index_pair_pattern = std::max(index_pair_pattern, relay::kElemWise);
         } else if (CheckBroadcastPattern(store_->indices, loads_[i])) {
           index_pair_pattern = std::max(index_pair_pattern, relay::kBroadcast);
