@@ -692,10 +692,6 @@ GlobalVar BlockBuilderNode::AddFunction(const BaseFunc& func, const String& func
       tir::PrimFunc fn = GetRef<tir::PrimFunc>(prim_func);
       fn = WithAttr(std::move(fn), "global_symbol", func_name);
       context_mod_->Add(gvar, fn);
-    } else if (const FunctionNode* rx_func = func.as<FunctionNode>()) {
-      auto fn = make_object<FunctionNode>(*rx_func);
-      fn->name = gvar;
-      context_mod_->Add(gvar, Function(fn));
     } else {
       context_mod_->Add(gvar, func);
     }

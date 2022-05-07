@@ -481,15 +481,13 @@ class FusedTIRConstructor : public ExprVisitor {
     } else {
       shape = op->body->shape();
     }
-    ICHECK(op->name);
     Array<tir::Buffer> buffers = CreateBuffers(ret_type, shape);
-    String name_prefix = op->name.value()->name_hint + "_output";
     for (int i = 0; i < static_cast<int>(buffers.size()); i++) {
       tir::Var var;
       if (buffers.size() == 1) {
-        var = tir::Var(name_prefix, PrimType(DataType::Handle()));
+        var = tir::Var("var", PrimType(DataType::Handle()));
       } else {
-        var = tir::Var(name_prefix + "_" + std::to_string(i), PrimType(DataType::Handle()));
+        var = tir::Var("var_" + std::to_string(i), PrimType(DataType::Handle()));
       }
       func_info_.buffer_map.Set(var, buffers[i]);
       func_info_.params.push_back(var);
@@ -568,7 +566,7 @@ class TIRFuseMutator : public ExprMutator {
   static IRModule Transform(const IRModule& mod) {
     TIRFuseMutator mutator(mod);
     BaseFunc main_func = mod->Lookup("main");
-    mutator.builder_->AddFuncToContext(Downcast<BaseFunc>(mutator.VisitExpr(main_func)), "main");
+    mutator.builder_->AddFunction(Downcast<BaseFunc>(mutator.VisitExpr(main_func)), "main");
     return mutator.builder_->GetContextIRModule();
   }
 
@@ -586,7 +584,7 @@ class TIRFuseMutator : public ExprMutator {
       BaseFunc func = mod_->Lookup(gv);
       tir::PrimFunc fused_tir = FusedTIRConstructor::GetFusedTIR(mod_, func);
       String name = fused_tir->attrs.GetAttr<String>("global_symbol").value_or("fused");
-      GlobalVar fused_tir_gv = this->builder_->AddFuncToContext(fused_tir, name);
+      GlobalVar fused_tir_gv = this->builder_->AddFunction(fused_tir, name);
       Array<Expr> arg_list;
       for (const Expr& arg : call->args) {
         // flatten input arg list
@@ -616,7 +614,7 @@ class TIRFuseMutator : public ExprMutator {
     // Handle call_tir in main function
     GlobalVar gv = Downcast<GlobalVar>(call->args[0]);
     tir::PrimFunc func = Downcast<tir::PrimFunc>(mod_->Lookup(gv));
-    GlobalVar new_gv = this->builder_->AddFuncToContext(func, gv->name_hint);
+    GlobalVar new_gv = this->builder_->AddFunction(func, gv->name_hint);
     return Call(call->op, {new_gv, call->args[1], call->args[2]}, call->attrs, call->type_args,
                 call->span);
   }
