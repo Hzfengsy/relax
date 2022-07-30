@@ -14,6 +14,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-"""TVMScript IR"""
+"""FFI APIs for tvm.script.builder.relax"""
+import tvm._ffi
 
-from .ir import IRModuleFrame, ir_module, is_defined_in_module
+tvm._ffi._init_api("script.builder.relax", __name__)  # pylint: disable=protected-access

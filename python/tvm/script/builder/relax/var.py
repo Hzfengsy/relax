@@ -14,6 +14,27 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-"""TVMScript IR"""
+"""TVM Script TIR Buffer"""
+from numbers import Integral
 
-from .ir import IRModuleFrame, ir_module, is_defined_in_module
+from tvm.ir import Array, PrimExpr, Range, PrimType
+from tvm.runtime import DataType, Object
+from tvm.relax.expr import Var
+
+from . import _ffi_api
+
+
+class Tensor_:
+    def __call__(
+        self,
+        shape,
+        dtype,
+    ) -> Var:
+        # TODO(@siyuan): support runtime dep shape.
+        return _ffi_api.Tensor(shape, dtype)  # pylint: disable=no-member # type: ignore
+
+    def __getitem__(self, keys) -> Var:
+        return self(*keys)  # pylint: disable=no-member # type: ignore
+
+
+Tensor = Tensor_()

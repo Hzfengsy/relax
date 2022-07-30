@@ -14,6 +14,4 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-"""TVMScript IR"""
-
-from .ir import IRModuleFrame, ir_module, is_defined_in_module
+from . import relax

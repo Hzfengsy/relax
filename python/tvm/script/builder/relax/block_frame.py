@@ -14,6 +14,17 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-"""TVMScript IR"""
+"""TVM Script Relax Block Frame"""
+from tvm._ffi import register_object as _register_object
 
-from .ir import IRModuleFrame, ir_module, is_defined_in_module
+from . import _ffi_api
+from .base import RelaxFrame
+
+
+@_register_object("script.builder.relax.BlockFrame")
+class BlockFrame(RelaxFrame):
+    ...
+
+
+def dataflow() -> BlockFrame:
+    return _ffi_api.Dataflow()  # pylint: disable=no-member # type: ignore

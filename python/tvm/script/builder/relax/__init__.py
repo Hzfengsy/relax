@@ -14,6 +14,11 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-"""TVMScript IR"""
+# pylint: disable=unused-import
+"""Namespace for the TVMScript Relax Builder API."""
 
-from .ir import IRModuleFrame, ir_module, is_defined_in_module
+from .base import RelaxFrame
+from .block_frame import dataflow
+from .function_frame import arg, func_attr, func_name, func_ret, function
+from .var import Tensor
+from .op import call_tir

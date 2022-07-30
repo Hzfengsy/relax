@@ -14,6 +14,20 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-"""TVMScript IR"""
+"""TVM Script Relax Op"""
 
-from .ir import IRModuleFrame, ir_module, is_defined_in_module
+from typing import List, Optional
+from tvm.relax import Expr, Var
+from tvm.tir import PrimExpr
+
+from . import _ffi_api
+
+
+def call_tir(
+    func: Expr,
+    args: List[Expr],
+    shape: List[PrimExpr],
+    dtype: str,
+    packed_ints: Optional[Expr] = None,
+) -> Var:
+    return _ffi_api.CallTIR(func, args, shape, dtype, packed_ints)  # type: ignore
