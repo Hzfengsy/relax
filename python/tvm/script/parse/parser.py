@@ -97,11 +97,11 @@ class Parser(doc.NodeVisitor):
         self,
         target: doc.expr,
         source: Any,
-        bind_value: Callable[["Parser", str, Any], Any],
+        bind_value: Callable[["Parser", doc.expr, str, Any], Any],
     ) -> Dict[str, Any]:
         var_values = eval_assign(self, target, source)
         for k, v in var_values.items():
-            var = bind_value(self, k, v)
+            var = bind_value(self, target, k, v)
             self.var_table.add(k, var)
         return var_values
 
