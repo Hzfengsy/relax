@@ -23,6 +23,10 @@ from ..parser import Parser
 def visit_class_def(self: Parser, node: doc.ClassDef) -> None:
     with self.var_table.with_frame():
         with I.ir_module():
+            for stmt in node.body:
+                if isinstance(stmt, doc.FunctionDef):
+                    name = stmt.name
+                    print(name)
             with self.with_dispatch_token("ir"):
                 self.visit_body(node.body)
 

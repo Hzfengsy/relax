@@ -19,7 +19,7 @@ import contextlib
 from functools import partial
 from typing import Any
 
-from ...builder import Frame, def_
+from ...builder import Frame, name
 from ...builder import relax as R
 from .. import dispatch, doc
 from ..parser import Parser
