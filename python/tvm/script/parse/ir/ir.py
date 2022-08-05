@@ -25,8 +25,8 @@ def visit_class_def(self: Parser, node: doc.ClassDef) -> None:
         with I.ir_module():
             for stmt in node.body:
                 if isinstance(stmt, doc.FunctionDef):
-                    name = stmt.name
-                    print(name)
+                    gv = I.add_function(stmt.name, func=None)
+                    self.var_table.add(stmt.name, gv)
             with self.with_dispatch_token("ir"):
                 self.visit_body(node.body)
 

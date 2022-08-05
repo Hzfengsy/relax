@@ -16,4 +16,4 @@
 # under the License.
 """TVMScript IR"""
 
-from .ir import IRModuleFrame, ir_module, is_defined_in_module
+from .ir import IRModuleFrame, ir_module, is_defined_in_module, add_function, update_function

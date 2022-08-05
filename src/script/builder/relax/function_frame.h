@@ -69,7 +69,9 @@ FunctionFrame Function();
 tvm::relax::Var Arg(const String& name, const tvm::relax::Var& var);
 void FuncName(const String& name);
 void FuncAttrs(Map<String, ObjectRef> attrs);
-tvm::Type FuncRet(tvm::Type ret_type);
+tvm::Type RetType(tvm::Type ret_type);
+void FuncReturn(const tvm::relax::Expr& value);
+
 
 }  // namespace relax
 }  // namespace builder

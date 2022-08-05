@@ -35,6 +35,7 @@ tvm::relax::Var CallTIR(const Expr& gv,                //
                         const Array<PrimExpr>& shape,  //
                         const DataType& dtype,         //
                         const Optional<Expr>& packed_ints);
+
 }  // namespace relax
 }  // namespace builder
 }  // namespace script

@@ -19,30 +19,16 @@ import contextlib
 from functools import partial
 from typing import Any
 
+from tvm.relax import Type, Var
+
 from ...builder import Frame, name
 from ...builder import relax as R
 from .. import dispatch, doc
 from ..parser import Parser
 
 
-def bind_value(self: Parser, name: str, value: Any) -> Any:
-    if isinstance(value, Frame):
-        value.add_callback(partial(value.__exit__, None, None, None))
-        res = value.__enter__()
-        def_(name, res)
-        return res
-    elif isinstance(value, (T.Buffer_, IterVar, Var, tuple, list)):
-        def_(name, value)
-        return value
-    elif isinstance(value, PrimExpr):
-        var = T.var(value.dtype)
-        def_(name, var)
-        frame = T.let(var, value)
-        frame.add_callback(partial(frame.__exit__, None, None, None))
-        frame.__enter__()
-        return var
-    else:
-        self.report_error("Do not know how to bind type: " + str(type(value)))
+def bind_assign_value(self: Parser, node: doc.expr, var_name: str, value: Any) -> Any:
+    return value
 
 
 @dispatch.register(token="relax", type_name="FunctionDef")
@@ -50,10 +36,10 @@ def visit_function_def(self: Parser, node: doc.FunctionDef) -> None:
     with self.var_table.with_frame():
         with R.function():
             R.func_name(node.name)
+            ret_type = self.eval_expr(node.returns)
+            R.ret_type(ret_type._checked_type_)
             with self.with_dispatch_token("relax"):
-                # TODO: define the GlobalVar
                 self.visit(node.args)
-                # self.visit(node.returns)
                 self.visit_body(node.body)
 
 
@@ -81,4 +67,10 @@ def visit_assign(self: Parser, node: doc.Assign) -> None:
         self.report_error(node, "Consequential assignments like 'a = b = c' are not supported.")
     lhs = node.targets[0]
     rhs = self.eval_expr(node.value)
-    self.eval_assign(target=lhs, source=rhs, bind_value=bind_value)
+    self.eval_assign(target=lhs, source=rhs, bind_value=bind_assign_value)
+
+
+@dispatch.register(token="relax", type_name="Return")
+def visit_return(self: Parser, node: doc.Assign) -> None:
+    value = self.eval_expr(node.value)
+    R.func_return(value)

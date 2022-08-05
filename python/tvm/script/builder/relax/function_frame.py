@@ -14,7 +14,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-"""TVM Script TIR Prim Func Frame"""
+"""TVM Script Relax Function Frame"""
 import inspect
 from typing import Callable, Mapping, Optional, Union, TypeVar
 
@@ -71,5 +71,9 @@ def func_attr(attrs: Mapping[str, Object]) -> None:
     return _ffi_api.FuncAttrs(attrs)  # pylint: disable=no-member # type: ignore
 
 
-def func_ret(ret_type: Type) -> Type:
-    return _ffi_api.FuncRet(ret_type)  # pylint: disable=no-member # type: ignore
+def ret_type(type: Type) -> Type:
+    return _ffi_api.RetType(type)  # pylint: disable=no-member # type: ignore
+
+
+def func_return(type: Type) -> Type:
+    return _ffi_api.FuncReturn(type)  # pylint: disable=no-member # type: ignore

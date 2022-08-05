@@ -19,6 +19,6 @@
 
 from .base import RelaxFrame
 from .block_frame import dataflow
-from .function_frame import arg, func_attr, func_name, func_ret, function
+from .function_frame import arg, func_attr, func_name, ret_type, function, func_return
 from .var import Tensor
 from .op import call_tir

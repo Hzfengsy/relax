@@ -28,7 +28,8 @@ namespace ir {
 
 class IRModuleFrameNode : public FrameNode {
  public:
-  Map<String, Optional<BaseFunc>> functions;
+  Map<String, GlobalVar> global_var_map;
+  Map<GlobalVar, Optional<BaseFunc>> functions;
 
   void VisitAttrs(tvm::AttrVisitor* v) {
     FrameNode::VisitAttrs(v);
@@ -49,10 +50,10 @@ class IRModuleFrame : public Frame {
 
 IRModuleFrame IRModule();
 GlobalVar AddFunction(const String& func_name,                   //
-                      const Optional<BaseFunc>& func = NullOpt,  //
-                      bool allow_rename = false);
+                 const Optional<BaseFunc>& func = NullOpt,  //
+                 bool allow_rename = false);
 
-void UpdateFunction(const String& func_name, const BaseFunc& func);
+void UpdateFunction(const String& func_name, const BaseFunc& func, bool require_first_define=true);
 
 }  // namespace ir
 }  // namespace builder

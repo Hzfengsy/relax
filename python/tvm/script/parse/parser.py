@@ -167,6 +167,9 @@ class Parser(doc.NodeVisitor):
     def visit_Assert(self, node: doc.Assert) -> Any:
         return _dispatch(self, "Assert")(self, node)  # pylint: disable=invalid-name
 
+    def visit_Return(self, node: doc.Return) -> Any:
+        return _dispatch(self, "Return")(self, node)  # pylint: disable=invalid-name
+
 
 def _handle_function(self: Parser, node: doc.FunctionDef) -> None:
     if not node.decorator_list:

@@ -39,10 +39,10 @@ IRModuleFrame IRModule() {
 void IRModuleFrameNode::ExitWithScope() {
   Map<GlobalVar, BaseFunc> func_map;
   for (const auto& kv : functions) {
-    const String& func_name = kv.first;
+    const GlobalVar& gv = kv.first;
     const Optional<BaseFunc>& func = kv.second;
-    CHECK(func.defined()) << "ValueError: function " << func_name << " is not defined";
-    func_map.Set(GlobalVar(func_name), func.value());
+    CHECK(func.defined()) << "ValueError: function " << gv->name_hint << " is not defined";
+    func_map.Set(gv, func.value());
   }
   Builder builder = Builder::Current();
   ICHECK(!builder->result.defined()) << "ValueError: Builder.result has already been set";
@@ -63,23 +63,32 @@ IRModuleFrame FindModuleFrame(const String& method) {
   throw;
 }
 
-GlobalVar AddFunction(const String& func_name,                   //
-                      const Optional<BaseFunc>& func = NullOpt,  //
-                      bool allow_rename = false) {
+GlobalVar AddFunction(const String& func_name,         //
+                      const Optional<BaseFunc>& func,  //
+                      bool allow_rename) {
   IRModuleFrame frame = FindModuleFrame("I.AddFunction");
   if (!allow_rename) {
-    CHECK(!frame->functions.count(func_name))
+    CHECK(!frame->global_var_map.count(func_name))
         << "ValueError: function " << func_name << " already exists";
   }
   String name = GetUniqueName(func_name);
-  frame->functions.Set(name, func);
+  GlobalVar gv = GlobalVar(name);
+  frame->global_var_map.Set(name, gv);
+  frame->functions.Set(gv, func);
+  return gv;
 }
 
-void UpdateFunction(const String& func_name, const BaseFunc& func) {
+void UpdateFunction(const String& func_name, const BaseFunc& func, bool require_first_define) {
   IRModuleFrame frame = FindModuleFrame("I.UpdateFunction");
-  CHECK(frame->functions.count(func_name))
+  auto it = frame->global_var_map.find(func_name);
+  CHECK(it != frame->global_var_map.end())
       << "ValueError: function " << func_name << " does not exist";
-  frame->functions.Set(func_name, func);
+  const GlobalVar& gv = (*it).second;
+  if (require_first_define) {
+    CHECK(!frame->functions.at(gv).defined())
+        << "ValueError: function " << func_name << " has already been defined";
+  }
+  frame->functions.Set(gv, func);
 }
 
 TVM_REGISTER_NODE_TYPE(IRModuleFrameNode);

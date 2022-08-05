@@ -50,18 +50,20 @@ void FunctionFrameNode::EnterWithScope() {
 
 void FunctionFrameNode::ExitWithScope() {
   using tvm::relax::Expr;
-  RelaxFrameNode::ExitWithScope();
   default_binding_block_frame->ExitWithScope();
+  RelaxFrameNode::ExitWithScope();
   Builder builder = Builder::Current();
   // Step 1: Create the function.
   Expr output = outputs.size() == 1 ? outputs[0] : tvm::relax::Tuple(outputs);
   output = this->block_builder->Normalize(output);
   Expr body = this->block_builder->Normalize(tvm::relax::SeqExpr(binding_blocks, output));
+  CHECK(ret_type.defined()) << "ValueError: Function return type must be defined";
   tvm::relax::Function func(/*params=*/params,
                             /*body=*/body,
-                            /*ret_type=*/ret_type.value_or(TupleType::Empty()),
+                            /*ret_type=*/ret_type.value(),
                             /*attrs=*/DictAttrs(attrs));
-
+  // TODO: remove this line
+  func = WithAttr(func, "global_symbol", name.value());
   // Step 2: Update IRModule.
   if (builder->frames.empty()) {
     // Case 0. If there is no output module frame.
@@ -69,8 +71,12 @@ void FunctionFrameNode::ExitWithScope() {
     builder->result = func;
   } else if (Optional<ir::IRModuleFrame> opt_frame = builder->FindFrame<ir::IRModuleFrame>()) {
     ir::IRModuleFrame frame = opt_frame.value();
-    frame->global_vars.push_back(GlobalVar(name.value_or("")));
-    frame->functions.push_back(func);
+    String func_name = name.value_or("");
+    if (frame->global_var_map.count(func_name)) {
+      ir::UpdateFunction(func_name, func);
+    } else {
+      ir::AddFunction(func_name, func, /*allow_rename=*/false);
+    }
   } else {
     LOG(FATAL) << "ValueError: Cannot find where to insert Relax.Function";
   }
@@ -107,7 +113,7 @@ void FuncAttrs(Map<String, ObjectRef> attrs) {
   frame->attrs = attrs;
 }
 
-tvm::Type FuncRet(tvm::Type ret_type) {
+tvm::Type RetType(tvm::Type ret_type) {
   FunctionFrame frame = FindFunctionFrame("R.ret_type");
   if (frame->ret_type.defined()) {
     LOG(FATAL) << "ValueError: Duplicate function return type, previous one is:\n "
@@ -117,12 +123,18 @@ tvm::Type FuncRet(tvm::Type ret_type) {
   return ret_type;
 }
 
+void FuncReturn(const tvm::relax::Expr& value) {
+  FunctionFrame frame = FindFunctionFrame("return");
+  frame->outputs.push_back(value);
+}
+
 TVM_REGISTER_NODE_TYPE(FunctionFrameNode);
 TVM_REGISTER_GLOBAL("script.builder.relax.Function").set_body_typed(Function);
 TVM_REGISTER_GLOBAL("script.builder.relax.Arg").set_body_typed(Arg);
 TVM_REGISTER_GLOBAL("script.builder.relax.FuncName").set_body_typed(FuncName);
 TVM_REGISTER_GLOBAL("script.builder.relax.FuncAttrs").set_body_typed(FuncAttrs);
-TVM_REGISTER_GLOBAL("script.builder.relax.FuncRet").set_body_typed(FuncRet);
+TVM_REGISTER_GLOBAL("script.builder.relax.RetType").set_body_typed(RetType);
+TVM_REGISTER_GLOBAL("script.builder.relax.FuncReturn").set_body_typed(FuncReturn);
 
 }  // namespace relax
 }  // namespace builder

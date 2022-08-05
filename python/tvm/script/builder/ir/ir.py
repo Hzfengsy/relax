@@ -20,10 +20,23 @@ import inspect
 from typing import Optional, Type, Union
 
 from tvm._ffi import register_object as _register_object
-from tvm.ir import IRModule
+from tvm.ir import IRModule, BaseFunc
 
 from ..frame import Frame
 from . import _ffi_api
+
+
+def is_defined_in_module(frames):
+    if len(frames) > 2:
+        maybe_class_frame = frames[2]
+        statement_list = maybe_class_frame[4]
+        first_statement = statement_list[0]
+        line = first_statement.strip()
+        if line.startswith("class "):
+            return True
+        if line.startswith("@") and "ir_module" in line:
+            return True
+    return False
 
 
 @_register_object("script.builder.ir.IRModuleFrame")
@@ -49,14 +62,11 @@ def ir_module(f: Optional[Type] = None) -> Union[IRModuleFrame, IRModule]:
 setattr(ir_module, "dispatch_token", "ir")
 
 
-def is_defined_in_module(frames):
-    if len(frames) > 2:
-        maybe_class_frame = frames[2]
-        statement_list = maybe_class_frame[4]
-        first_statement = statement_list[0]
-        line = first_statement.strip()
-        if line.startswith("class "):
-            return True
-        if line.startswith("@") and "ir_module" in line:
-            return True
-    return False
+def add_function(name: str, func: Optional[BaseFunc] = None, allow_rename: bool = False) -> None:
+    return _ffi_api.AddFunction(
+        name, func, allow_rename
+    )  # pylint: disable=no-member # type: ignore
+
+
+def update_function(name: str, func: BaseFunc, require_first_define: bool=True) -> None:
+    return _ffi_api.UpdateFunction(name, func, require_first_define)  # pylint: disable=no-member # type: ignore
