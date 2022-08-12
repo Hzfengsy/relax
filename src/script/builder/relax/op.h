@@ -30,7 +30,13 @@ namespace builder {
 namespace relax {
 
 using tvm::relax::Expr;
-tvm::relax::Var CallTIR(const Expr& gv,                //
+tvm::relax::Var CallTIR(const Expr& func,              //
+                        const Array<Expr>& args,       //
+                        const Array<PrimExpr>& shape,  //
+                        const DataType& dtype,         //
+                        const Optional<Expr>& packed_ints);
+
+tvm::relax::Var CallTIR(const String& func_name,       //
                         const Array<Expr>& args,       //
                         const Array<PrimExpr>& shape,  //
                         const DataType& dtype,         //

@@ -51,9 +51,9 @@ def function(f: Optional[FType] = None) -> Union[FunctionFrame, FType]:
 
     if not inspect.isfunction(f):
         raise TypeError(f"Expect a function, but got: {f}")
-    if not is_defined_in_module(inspect.stack()):
-        raise ValueError("Relax functions are expected to be defined in an ir_module")
-    return f
+    if is_defined_in_module(inspect.stack()):
+        return f
+    return parse(f, inspect_function_capture(f))
 
 
 setattr(function, "dispatch_token", "relax")

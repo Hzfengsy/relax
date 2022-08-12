@@ -16,6 +16,7 @@
 # under the License.
 """TVM Script Relax Buffer"""
 from numbers import Integral
+from typing import List, Optional, Union
 
 from tvm.ir import Array, PrimExpr, Range, PrimType
 from tvm.runtime import DataType, Object
@@ -27,11 +28,12 @@ from . import _ffi_api
 class Tensor_:
     def __call__(
         self,
-        shape,
-        dtype,
+        shape: Optional[List[Union[PrimExpr, str]]],
+        dtype: str,
+        ndim: Optional[int] = None,
     ) -> Var:
         # TODO(@siyuan): support runtime dep shape.
-        return _ffi_api.Tensor(shape, dtype)  # pylint: disable=no-member # type: ignore
+        return _ffi_api.Tensor(shape, dtype, ndim)  # pylint: disable=no-member # type: ignore
 
     def __getitem__(self, keys) -> Var:
         return self(*keys)  # pylint: disable=no-member # type: ignore

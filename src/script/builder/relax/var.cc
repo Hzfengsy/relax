@@ -33,11 +33,25 @@ TVM_STATIC_IR_FUNCTOR(Namer, vtable)
       var->vid = tvm::relax::Id(name);
     });
 
-tvm::relax::Var Tensor(Array<PrimExpr> shape, DataType dtype) {
+tvm::relax::Var Tensor(Optional<Array<PrimExpr>> shape, DataType dtype, Optional<Integer> ndim) {
   using namespace tvm::relax;
-  int ndim = shape.size();
-  Type dyn_tensor_type = DynTensorType(ndim, dtype);
-  ShapeExpr shape_expr = ShapeExpr(shape);
+  int n_dim = -1;
+  if (shape.defined() && ndim.defined()) {
+    CHECK_EQ(shape.value().size(), ndim.value()->value)
+        << "The dimension of the given shape is mismatched with the given `ndim`";
+    n_dim = shape.value().size();
+  } else if (shape.defined()) {
+    n_dim = shape.value().size();
+  } else if (ndim.defined()) {
+    n_dim = ndim.value()->value;
+  } else {
+    LOG(FATAL) << "The `ndim` must be specified when the shape is None";
+  }
+  Type dyn_tensor_type = DynTensorType(n_dim, dtype);
+  Optional<Expr> shape_expr = NullOpt;
+  if (shape.defined()) {
+    shape_expr = ShapeExpr(shape.value());
+  }
   return Var("", shape_expr, dyn_tensor_type);
 }
 

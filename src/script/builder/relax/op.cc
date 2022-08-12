@@ -49,7 +49,28 @@ tvm::relax::Var CallTIR(const Expr& func,              //
   return block_builder->Emit(call_tir);
 }
 
-TVM_REGISTER_GLOBAL("script.builder.relax.CallTIR").set_body_typed(CallTIR);
+tvm::relax::Var CallTIR(const String& func_name,       //
+                        const Array<Expr>& args,       //
+                        const Array<PrimExpr>& shape,  //
+                        const DataType& dtype,         //
+                        const Optional<Expr>& packed_ints) {
+  Expr func = tvm::relax::ExternFunc(func_name);
+  return CallTIR(func, args, shape, dtype, packed_ints);
+}
+
+TVM_REGISTER_GLOBAL("script.builder.relax.CallTIR").set_body([](TVMArgs args, TVMRetValue* rv) {
+  CHECK_EQ(args.num_args, 5);
+  const auto& arg = args[0];
+  if (String::CanConvertFrom(arg)) {
+    const String& name = arg.operator String();
+    *rv = CallTIR(name, args[1], args[2], args[3], args[4]);
+  } else if (arg.IsObjectRef<Expr>()) {
+    *rv = CallTIR(arg.AsObjectRef<Expr>(), args[1], args[2], args[3], args[4]);
+  } else {
+    LOG(FATAL) << "call_tir expected a string or an expr as first argument, but got "
+               << runtime::ArgTypeCode2Str(arg.type_code());
+  }
+});
 
 }  // namespace relax
 }  // namespace builder

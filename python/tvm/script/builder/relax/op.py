@@ -30,4 +30,6 @@ def call_tir(
     dtype: str,
     packed_ints: Optional[Expr] = None,
 ) -> Var:
+    if not isinstance(args, (list, tuple)):
+        args = (args,)
     return _ffi_api.CallTIR(func, args, shape, dtype, packed_ints)  # type: ignore

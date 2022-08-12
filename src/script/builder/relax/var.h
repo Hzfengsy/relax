@@ -28,7 +28,8 @@ namespace script {
 namespace builder {
 namespace relax {
 
-tvm::relax::Var Tensor(Array<PrimExpr> shape, DataType dtype);
+tvm::relax::Var Tensor(Optional<Array<PrimExpr>> shape, DataType dtype,
+                       Optional<Integer> ndim = NullOpt);
 
 // TODO(@Siyuan): add dyn shape support
 
