@@ -23,6 +23,7 @@ from tvm.runtime import DataType, Object
 from tvm.relax.expr import Var
 
 from . import _ffi_api
+from .. import tir as T
 
 
 class Tensor_:
@@ -32,6 +33,12 @@ class Tensor_:
         dtype: str,
         ndim: Optional[int] = None,
     ) -> Var:
+        if isinstance(shape, (tuple, list)):
+            shape = list(shape)
+            for i, s in enumerate(shape):
+                if isinstance(s, str):
+                    shape[i] = T.var("int64", s)
+
         # TODO(@siyuan): support runtime dep shape.
         return _ffi_api.Tensor(shape, dtype, ndim)  # pylint: disable=no-member # type: ignore
 

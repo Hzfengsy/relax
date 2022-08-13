@@ -31,5 +31,16 @@ def test_simple_func():
     _check(test_func)
 
 
+def test_symbolic_shape():
+    @R.function
+    def test_func(x: R.Tensor(("m", "n"), "float32")) -> R.Tensor(None, "float32", ndim=2):
+        m = T.var("int32", "m")
+        n = T.var("int32", "n")
+        gv0 = R.call_tir("extern_func", x, (m, n), dtype="float32")
+        return gv0
+
+    _check(test_func)
+
+
 if __name__ == "__main__":
     tvm.testing.main()

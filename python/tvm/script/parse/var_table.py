@@ -56,14 +56,14 @@ class VarTable:
         self.frames.append(VarTableFrame())
         return deferred(pop_frame)
 
-    def add(self, var: str, value: Any):
+    def add(self, var: str, value: Any) -> None:
         self.frames[-1].add(var)
         self.name2value[var].append(value)
 
     def get(self) -> Dict[str, Any]:
         return {key: values[-1] for key, values in self.name2value.items() if values}
 
-    def exist(self, value: Any):
+    def exist(self, value: Any) -> bool:
         for v in self.name2value.values():
             if v is value:
                 return True

@@ -20,6 +20,7 @@ from functools import partial
 from typing import Any
 
 from tvm.relax import Type, Var
+from tvm import tir
 
 from ...builder import Frame, name
 from ...builder import relax as R
@@ -49,7 +50,13 @@ def visit_arguments(self: Parser, node: doc.arguments) -> None:
     for arg in node.args:
         if arg.annotation is None:
             self.report_error(arg, "Type annotation is required for function parameters.")
-        param = R.arg(arg.arg, self.visit_tvm_annotation(arg.annotation))
+        var = self.visit_tvm_annotation(arg.annotation)
+        param = R.arg(arg.arg, var)
+        # Define the symbolic shape var
+        for shape_expr in var.shape_:
+            if isinstance(shape_expr, tir.Var):
+                self.var_table.add(shape_expr.name, shape_expr)
+
         self.var_table.add(arg.arg, param)
 
 
@@ -67,7 +74,17 @@ def visit_assign(self: Parser, node: doc.Assign) -> None:
         self.report_error(node, "Consequential assignments like 'a = b = c' are not supported.")
     lhs = node.targets[0]
     rhs = self.eval_expr(node.value)
-    self.eval_assign(target=lhs, source=rhs, bind_value=bind_assign_value)
+    value_table = self.var_table.get()
+    if (
+        isinstance(value_table.get(lhs.id, None), tir.Var)
+        and isinstance(rhs, tir.Var)
+        and rhs.name == lhs.id
+    ):
+        # Support redefine symbolic shape
+        # e.g. m = T.var("int64", "m")
+        pass
+    else:
+        self.eval_assign(target=lhs, source=rhs, bind_value=bind_assign_value)
 
 
 @dispatch.register(token="relax", type_name="Return")
